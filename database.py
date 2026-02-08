@@ -25,6 +25,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False)
     name = Column(String(255), nullable=False)
     google_id = Column(String(255), unique=True)
+    is_premium = Column(Integer, default=0)  # 0=Normal, 1=Premium
     created_at = Column(DateTime, default=datetime.utcnow)
     
     notes = relationship("Note", back_populates="owner")
@@ -41,6 +42,9 @@ class Note(Base):
     price = Column(Float, nullable=False)
     file_path = Column(String(500))
     downloads = Column(Integer, default=0)
+    views = Column(Integer, default=0)
+    shares = Column(Integer, default=0)
+    likes = Column(Integer, default=0)
     earnings = Column(Float, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     

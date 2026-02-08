@@ -104,7 +104,19 @@ def get_notes(subject: Optional[str] = None, db: Session = Depends(get_db)):
     if subject:
         query = query.filter(Note.subject == subject)
     notes = query.all()
-    return [{"id": n.id, "title": n.title, "subject": n.subject, "price": n.price, "downloads": n.downloads} for n in notes]
+    return [{
+        "id": n.id,
+        "title": n.title,
+        "subject": n.subject,
+        "description": n.description,
+        "price": n.price,
+        "downloads": n.downloads,
+        "views": n.views,
+        "shares": n.shares,
+        "likes": n.likes,
+        "user_id": n.user_id,
+        "owner_name": n.owner.name
+    } for n in notes]
 
 @app.get("/api/notes/{note_id}")
 def get_note(note_id: int, db: Session = Depends(get_db)):
@@ -144,3 +156,104 @@ def get_earnings(token: str, db: Session = Depends(get_db)):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+@app.post("/api/notes/{note_id}/like")
+def like_note(note_id: int, token: str, db: Session = Depends(get_db)):
+    verify_token(token)
+    note = db.query(Note).filter(Note.id == note_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    note.likes += 1
+    db.commit()
+    return {"message": "Liked", "likes": note.likes}
+
+@app.post("/api/notes/{note_id}/share")
+def share_note(note_id: int, token: str, db: Session = Depends(get_db)):
+    verify_token(token)
+    note = db.query(Note).filter(Note.id == note_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    note.shares += 1
+    db.commit()
+    return {"message": "Shared", "shares": note.shares}
+
+@app.post("/api/notes/{note_id}/view")
+def view_note(note_id: int, token: str, db: Session = Depends(get_db)):
+    verify_token(token)
+    note = db.query(Note).filter(Note.id == note_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    note.views += 1
+    db.commit()
+    return {"message": "Viewed", "views": note.views}
+
+@app.get("/api/user/my-notes")
+def get_my_notes(token: str, db: Session = Depends(get_db)):
+    user_id = int(verify_token(token))
+    notes = db.query(Note).filter(Note.user_id == user_id).all()
+    return [{
+        "id": n.id,
+        "title": n.title,
+        "subject": n.subject,
+        "downloads": n.downloads,
+        "views": n.views,
+        "shares": n.shares,
+        "likes": n.likes,
+        "earnings": n.earnings
+    } for n in notes]
+
+@app.delete("/api/notes/{note_id}")
+def delete_note(note_id: int, token: str, db: Session = Depends(get_db)):
+    user_id = int(verify_token(token))
+    note = db.query(Note).filter(Note.id == note_id, Note.user_id == user_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found or unauthorized")
+    db.delete(note)
+    db.commit()
+    return {"message": "Note deleted"}
+
+@app.put("/api/notes/{note_id}")
+def update_note(note_id: int, title: str, subject: str, description: str, price: float, token: str, db: Session = Depends(get_db)):
+    user_id = int(verify_token(token))
+    note = db.query(Note).filter(Note.id == note_id, Note.user_id == user_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found or unauthorized")
+    note.title = title
+    note.subject = subject
+    note.description = description
+    note.price = price
+    db.commit()
+    return {"message": "Note updated", "note": {"id": note.id, "title": note.title}}
+
+@app.post("/api/notes/{note_id}/download")
+def download_note(note_id: int, token: str, db: Session = Depends(get_db)):
+    user_id = int(verify_token(token))
+    user = db.query(User).filter(User.id == user_id).first()
+    
+    # Check if premium user
+    if not user.is_premium:
+        raise HTTPException(status_code=403, detail="Premium subscription required to download notes")
+    
+    note = db.query(Note).filter(Note.id == note_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    note.downloads += 1
+    note.earnings += note.price
+    
+    transaction = Transaction(note_id=note.id, buyer_id=user_id, amount=note.price)
+    db.add(transaction)
+    db.commit()
+    
+    return {"message": "Download successful", "file_path": note.file_path}
+
+@app.post("/api/user/upgrade-premium")
+def upgrade_premium(token: str, db: Session = Depends(get_db)):
+    user_id = int(verify_token(token))
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_premium = 1
+    db.commit()
+    return {"message": "Upgraded to premium", "is_premium": True}
