@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text, inspect
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -25,7 +25,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False)
     name = Column(String(255), nullable=False)
     google_id = Column(String(255), unique=True)
-    is_premium = Column(Integer, default=0)  # 0=Normal, 1=Premium
+    is_premium = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     notes = relationship("Note", back_populates="owner")
@@ -64,7 +64,32 @@ class Transaction(Base):
     buyer = relationship("User", back_populates="transactions")
 
 def init_db():
-    Base.metadata.create_all(bind=engine)
+    """Initialize database and auto-migrate missing columns"""
+    try:
+        # Create all tables
+        Base.metadata.create_all(bind=engine)
+        
+        # Auto-migrate missing columns
+        inspector = inspect(engine)
+        
+        # Check notes table columns
+        if inspector.has_table("notes"):
+            existing_columns = [col['name'] for col in inspector.get_columns('notes')]
+            required_columns = ['views', 'shares', 'likes', 'earnings']
+            
+            with engine.connect() as conn:
+                for col in required_columns:
+                    if col not in existing_columns:
+                        if col == 'earnings':
+                            conn.execute(f"ALTER TABLE notes ADD COLUMN {col} FLOAT DEFAULT 0")
+                        else:
+                            conn.execute(f"ALTER TABLE notes ADD COLUMN {col} INT DEFAULT 0")
+                        conn.commit()
+                        print(f"Added missing column: {col}")
+        
+        print("Database initialized successfully!")
+    except Exception as e:
+        print(f"Database initialization error: {e}")
 
 def get_db():
     db = SessionLocal()
