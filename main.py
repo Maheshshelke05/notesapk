@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -93,7 +93,14 @@ def get_profile(token: str, db: Session = Depends(get_db)):
     return {"id": user.id, "email": user.email, "name": user.name}
 
 @app.post("/api/notes/upload")
-async def upload_note(title: str, subject: str, description: str, file: UploadFile = File(...), token: str = None, db: Session = Depends(get_db)):
+async def upload_note(
+    file: UploadFile = File(...),
+    title: str = Form(...),
+    subject: str = Form(...),
+    description: str = Form(...),
+    token: str = Form(...),
+    db: Session = Depends(get_db)
+):
     try:
         user_id = int(verify_token(token))
         
