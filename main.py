@@ -286,3 +286,20 @@ def upgrade_premium(token: str, db: Session = Depends(get_db)):
     user.is_premium = 1
     db.commit()
     return {"message": "Upgraded to premium", "is_premium": True}
+
+
+@app.post("/api/notes/upload-debug")
+async def upload_debug(
+    file: UploadFile = File(None),
+    title: str = Form(None),
+    subject: str = Form(None),
+    description: str = Form(None),
+    token: str = Form(None)
+):
+    return {
+        "file": file.filename if file else None,
+        "title": title,
+        "subject": subject,
+        "description": description,
+        "token": token[:20] if token else None
+    }
