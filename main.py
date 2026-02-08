@@ -94,34 +94,41 @@ def get_profile(token: str, db: Session = Depends(get_db)):
 
 @app.post("/api/notes/upload")
 async def upload_note(title: str, subject: str, description: str, file: UploadFile = File(...), token: str = None, db: Session = Depends(get_db)):
-    user_id = int(verify_token(token))
-    
-    # Upload to S3
-    file_content = await file.read()
-    file_key = f"notes/{user_id}/{datetime.utcnow().timestamp()}_{file.filename}"
-    
-    s3_client.put_object(
-        Bucket=AWS_BUCKET,
-        Key=file_key,
-        Body=file_content,
-        ContentType='application/pdf'
-    )
-    
-    # Generate S3 URL
-    s3_url = f"https://{AWS_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{file_key}"
-    
-    note = Note(
-        user_id=user_id,
-        title=title,
-        subject=subject,
-        description=description,
-        price=0,
-        file_path=s3_url
-    )
-    db.add(note)
-    db.commit()
-    db.refresh(note)
-    return {"message": "Note uploaded", "note": {"id": note.id, "title": note.title, "url": s3_url}}
+    try:
+        user_id = int(verify_token(token))
+        
+        # Read file content
+        file_content = await file.read()
+        file_key = f"notes/{user_id}/{datetime.utcnow().timestamp()}_{file.filename}"
+        
+        # Upload to S3
+        s3_client.put_object(
+            Bucket=AWS_BUCKET,
+            Key=file_key,
+            Body=file_content,
+            ContentType='application/pdf',
+            ACL='public-read'
+        )
+        
+        # Generate S3 URL
+        s3_url = f"https://{AWS_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{file_key}"
+        
+        # Save to database
+        note = Note(
+            user_id=user_id,
+            title=title,
+            subject=subject,
+            description=description,
+            price=0,
+            file_path=s3_url
+        )
+        db.add(note)
+        db.commit()
+        db.refresh(note)
+        
+        return {"message": "Note uploaded", "note": {"id": note.id, "title": note.title, "url": s3_url}}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 @app.get("/api/notes")
 def get_notes(subject: Optional[str] = None, db: Session = Depends(get_db)):
