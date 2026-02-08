@@ -1,85 +1,39 @@
-# Notes2Cash Backend - Python FastAPI
+# Backend - Notes2Cash API
 
-## Local Development
+FastAPI backend for Notes2Cash application.
 
+## Features
+- JWT Authentication
+- Google OAuth integration
+- AWS S3 file storage
+- MySQL database
+- RESTful API endpoints
+
+## Setup
+
+1. Install dependencies:
 ```bash
-# Install dependencies
 pip install -r requirements.txt
+```
 
-# Run server
+2. Configure environment:
+```bash
+cp .env.example .env
+# Edit .env with your credentials
+```
+
+3. Run server:
+```bash
 python main.py
-
-# API will run at: http://localhost:8000
-# Docs at: http://localhost:8000/docs
 ```
 
-## AWS EC2 Deployment
-
-### 1. Launch EC2 Instance
-- AMI: Amazon Linux 2023
-- Instance Type: t2.micro (free tier)
-- Security Group: Allow ports 22, 80, 8000
-
-### 2. Connect to Server
-```bash
-ssh -i "your-key.pem" ec2-user@YOUR_EC2_IP
-```
-
-### 3. Upload Backend Files
-```bash
-# On your local machine
-scp -i "your-key.pem" -r backend/* ec2-user@YOUR_EC2_IP:/home/ec2-user/
-```
-
-### 4. Run Deployment Script
-```bash
-# On EC2 server
-cd /home/ec2-user
-chmod +x deploy.sh
-sudo ./deploy.sh
-```
-
-### 5. Verify Deployment
-```bash
-# Check service status
-sudo systemctl status notes2cash
-
-# View logs
-sudo journalctl -u notes2cash -f
-
-# Test API
-curl http://localhost:8000
-```
+Server runs at: http://localhost:8000
+API Docs: http://localhost:8000/docs
 
 ## API Endpoints
 
-### Auth
-- `POST /api/auth/google` - Google login
-- `GET /api/user/profile?token=xxx` - Get user profile
+See main README.md for complete API documentation.
 
-### Notes
-- `GET /api/notes` - Get all notes
-- `GET /api/notes/{id}` - Get note by ID
-- `POST /api/notes/upload` - Upload note (requires token)
-- `POST /api/notes/{id}/download` - Download note (requires token)
+## Deployment
 
-### Earnings
-- `GET /api/user/earnings?token=xxx` - Get user earnings
-
-## Environment Variables
-
-Create `.env` file:
-```
-SECRET_KEY=your-secret-key
-DATABASE_URL=sqlite:///./notes.db
-PORT=8000
-```
-
-## Flutter Integration
-
-Update API URL in Flutter app:
-```dart
-class ApiService {
-  static const String baseUrl = 'http://YOUR_EC2_IP:8000/api';
-}
-```
+Use `deploy.sh` for AWS EC2 deployment.
