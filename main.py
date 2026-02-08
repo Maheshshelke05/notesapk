@@ -2,9 +2,11 @@ from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+from sqlalchemy.orm import Session
 import jwt
 from datetime import datetime, timedelta
 import os
+from database import init_db, get_db, User, Note, Transaction
 
 app = FastAPI(title="Notes2Cash API")
 
@@ -20,12 +22,15 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
 UPLOAD_DIR = "uploads/notes"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-class User(BaseModel):
+# Initialize database tables
+init_db()
+
+class UserCreate(BaseModel):
     email: str
     name: str
     google_id: str
 
-class Note(BaseModel):
+class NoteCreate(BaseModel):
     title: str
     subject: str
     description: str
@@ -33,9 +38,6 @@ class Note(BaseModel):
 
 class LoginRequest(BaseModel):
     google_token: str
-
-users_db = {}
-notes_db = []
 
 def create_token(user_id: str):
     payload = {"user_id": user_id, "exp": datetime.utcnow() + timedelta(days=30)}
@@ -53,73 +55,90 @@ def root():
     return {"message": "Notes2Cash API", "status": "running"}
 
 @app.post("/api/auth/google")
-def google_login(request: LoginRequest):
-    user_id = f"user_{len(users_db) + 1}"
-    user = {"id": user_id, "email": "user@example.com", "name": "Test User"}
-    users_db[user_id] = user
-    token = create_token(user_id)
-    return {"token": token, "user": user}
+def google_login(request: LoginRequest, db: Session = Depends(get_db)):
+    # Verify Google token and get user info
+    user_email = "user@example.com"
+    user_name = "Test User"
+    google_id = "google_123"
+    
+    user = db.query(User).filter(User.email == user_email).first()
+    if not user:
+        user = User(email=user_email, name=user_name, google_id=google_id)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    
+    token = create_token(str(user.id))
+    return {"token": token, "user": {"id": user.id, "email": user.email, "name": user.name}}
 
 @app.get("/api/user/profile")
-def get_profile(token: str):
-    user_id = verify_token(token)
-    user = users_db.get(user_id)
+def get_profile(token: str, db: Session = Depends(get_db)):
+    user_id = int(verify_token(token))
+    user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return user
+    return {"id": user.id, "email": user.email, "name": user.name}
 
 @app.post("/api/notes/upload")
-async def upload_note(title: str, subject: str, description: str, price: float, file: UploadFile = File(...), token: str = None):
-    user_id = verify_token(token)
+async def upload_note(title: str, subject: str, description: str, price: float, file: UploadFile = File(...), token: str = None, db: Session = Depends(get_db)):
+    user_id = int(verify_token(token))
     file_path = f"{UPLOAD_DIR}/{file.filename}"
     with open(file_path, "wb") as f:
         f.write(await file.read())
-    note = {
-        "id": len(notes_db) + 1,
-        "user_id": user_id,
-        "title": title,
-        "subject": subject,
-        "description": description,
-        "price": price,
-        "file_path": file_path,
-        "downloads": 0,
-        "earnings": 0,
-        "created_at": datetime.utcnow().isoformat()
-    }
-    notes_db.append(note)
-    return {"message": "Note uploaded", "note": note}
+    
+    note = Note(
+        user_id=user_id,
+        title=title,
+        subject=subject,
+        description=description,
+        price=price,
+        file_path=file_path
+    )
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    return {"message": "Note uploaded", "note": {"id": note.id, "title": note.title, "price": note.price}}
 
 @app.get("/api/notes")
-def get_notes(subject: Optional[str] = None):
+def get_notes(subject: Optional[str] = None, db: Session = Depends(get_db)):
+    query = db.query(Note)
     if subject:
-        return [n for n in notes_db if n["subject"] == subject]
-    return notes_db
+        query = query.filter(Note.subject == subject)
+    notes = query.all()
+    return [{"id": n.id, "title": n.title, "subject": n.subject, "price": n.price, "downloads": n.downloads} for n in notes]
 
 @app.get("/api/notes/{note_id}")
-def get_note(note_id: int):
-    note = next((n for n in notes_db if n["id"] == note_id), None)
+def get_note(note_id: int, db: Session = Depends(get_db)):
+    note = db.query(Note).filter(Note.id == note_id).first()
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
-    return note
+    return {"id": note.id, "title": note.title, "subject": note.subject, "description": note.description, "price": note.price}
 
 @app.post("/api/notes/{note_id}/download")
-def download_note(note_id: int, token: str):
-    user_id = verify_token(token)
-    note = next((n for n in notes_db if n["id"] == note_id), None)
+def download_note(note_id: int, token: str, db: Session = Depends(get_db)):
+    user_id = int(verify_token(token))
+    note = db.query(Note).filter(Note.id == note_id).first()
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
-    note["downloads"] += 1
-    note["earnings"] += note["price"]
-    return {"message": "Download successful", "file_path": note["file_path"]}
+    
+    note.downloads += 1
+    note.earnings += note.price
+    
+    transaction = Transaction(note_id=note.id, buyer_id=user_id, amount=note.price)
+    db.add(transaction)
+    db.commit()
+    
+    return {"message": "Download successful", "file_path": note.file_path}
 
 @app.get("/api/user/earnings")
-def get_earnings(token: str):
-    user_id = verify_token(token)
-    user_notes = [n for n in notes_db if n["user_id"] == user_id]
-    total_earnings = sum(n["earnings"] for n in user_notes)
+def get_earnings(token: str, db: Session = Depends(get_db)):
+    user_id = int(verify_token(token))
+    user_notes = db.query(Note).filter(Note.user_id == user_id).all()
+    total_earnings = sum(n.earnings for n in user_notes)
+    total_downloads = sum(n.downloads for n in user_notes)
     return {
         "total_earnings": total_earnings,
-        "total_downloads": sum(n["downloads"] for n in user_notes),
+        "total_downloads": total_downloads,
         "notes_count": len(user_notes)
     }
 
