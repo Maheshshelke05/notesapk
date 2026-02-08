@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 import jwt
 from datetime import datetime, timedelta
 import os
+import boto3
 from database import init_db, get_db, User, Note, Transaction
 
 app = FastAPI(title="Notes2Cash API")
@@ -21,6 +22,19 @@ app.add_middleware(
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
 UPLOAD_DIR = "uploads/notes"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# AWS S3 Configuration
+AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_BUCKET = os.getenv("AWS_S3_BUCKET", "noteshub-free-wala")
+
+s3_client = boto3.client(
+    's3',
+    region_name=AWS_REGION,
+    aws_access_key_id=AWS_ACCESS_KEY,
+    aws_secret_access_key=AWS_SECRET_KEY
+)
 
 # Initialize database tables
 init_db()
@@ -79,24 +93,35 @@ def get_profile(token: str, db: Session = Depends(get_db)):
     return {"id": user.id, "email": user.email, "name": user.name}
 
 @app.post("/api/notes/upload")
-async def upload_note(title: str, subject: str, description: str, price: float, file: UploadFile = File(...), token: str = None, db: Session = Depends(get_db)):
+async def upload_note(title: str, subject: str, description: str, file: UploadFile = File(...), token: str = None, db: Session = Depends(get_db)):
     user_id = int(verify_token(token))
-    file_path = f"{UPLOAD_DIR}/{file.filename}"
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
+    
+    # Upload to S3
+    file_content = await file.read()
+    file_key = f"notes/{user_id}/{datetime.utcnow().timestamp()}_{file.filename}"
+    
+    s3_client.put_object(
+        Bucket=AWS_BUCKET,
+        Key=file_key,
+        Body=file_content,
+        ContentType='application/pdf'
+    )
+    
+    # Generate S3 URL
+    s3_url = f"https://{AWS_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{file_key}"
     
     note = Note(
         user_id=user_id,
         title=title,
         subject=subject,
         description=description,
-        price=price,
-        file_path=file_path
+        price=0,
+        file_path=s3_url
     )
     db.add(note)
     db.commit()
     db.refresh(note)
-    return {"message": "Note uploaded", "note": {"id": note.id, "title": note.title, "price": note.price}}
+    return {"message": "Note uploaded", "note": {"id": note.id, "title": note.title, "url": s3_url}}
 
 @app.get("/api/notes")
 def get_notes(subject: Optional[str] = None, db: Session = Depends(get_db)):
@@ -229,24 +254,14 @@ def update_note(note_id: int, title: str, subject: str, description: str, price:
 @app.post("/api/notes/{note_id}/download")
 def download_note(note_id: int, token: str, db: Session = Depends(get_db)):
     user_id = int(verify_token(token))
-    user = db.query(User).filter(User.id == user_id).first()
-    
-    # Check if premium user
-    if not user.is_premium:
-        raise HTTPException(status_code=403, detail="Premium subscription required to download notes")
-    
     note = db.query(Note).filter(Note.id == note_id).first()
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
     
     note.downloads += 1
-    note.earnings += note.price
-    
-    transaction = Transaction(note_id=note.id, buyer_id=user_id, amount=note.price)
-    db.add(transaction)
     db.commit()
     
-    return {"message": "Download successful", "file_path": note.file_path}
+    return {"message": "Download successful", "file_url": note.file_path}
 
 @app.post("/api/user/upgrade-premium")
 def upgrade_premium(token: str, db: Session = Depends(get_db)):
