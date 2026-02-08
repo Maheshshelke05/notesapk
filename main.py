@@ -55,15 +55,14 @@ def root():
     return {"message": "Notes2Cash API", "status": "running"}
 
 @app.post("/api/auth/google")
-def google_login(request: LoginRequest, db: Session = Depends(get_db)):
-    # Verify Google token and get user info
-    user_email = "user@example.com"
-    user_name = "Test User"
-    google_id = "google_123"
+def google_login(request: dict, db: Session = Depends(get_db)):
+    email = request.get('email')
+    name = request.get('name')
+    google_id = request.get('google_id')
     
-    user = db.query(User).filter(User.email == user_email).first()
+    user = db.query(User).filter(User.email == email).first()
     if not user:
-        user = User(email=user_email, name=user_name, google_id=google_id)
+        user = User(email=email, name=name, google_id=google_id)
         db.add(user)
         db.commit()
         db.refresh(user)
