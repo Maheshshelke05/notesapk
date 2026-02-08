@@ -63,6 +63,14 @@ class Transaction(Base):
     note = relationship("Note", back_populates="transactions")
     buyer = relationship("User", back_populates="transactions")
 
+class NoteLike(Base):
+    __tablename__ = "note_likes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    note_id = Column(Integer, ForeignKey("notes.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 def init_db():
     """Initialize database and auto-migrate missing columns"""
     try:

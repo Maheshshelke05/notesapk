@@ -6,7 +6,7 @@ import jwt
 from datetime import datetime, timedelta
 import os
 import boto3
-from database import init_db, get_db, User, Note, Transaction
+from database import init_db, get_db, User, Note, Transaction, NoteLike
 
 app = FastAPI(title="Notes2Cash API")
 
@@ -130,13 +130,22 @@ def download_note(note_id: int, token: str, db: Session = Depends(get_db)):
 
 @app.post("/api/notes/{note_id}/like")
 def like_note(note_id: int, token: str, db: Session = Depends(get_db)):
-    verify_token(token)
+    user_id = int(verify_token(token))
     note = db.query(Note).filter(Note.id == note_id).first()
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
+    
+    # Check if user already liked
+    existing_like = db.query(NoteLike).filter(NoteLike.note_id == note_id, NoteLike.user_id == user_id).first()
+    if existing_like:
+        return {"message": "Already liked", "likes": note.likes, "isLiked": True}
+    
+    # Add new like
+    new_like = NoteLike(note_id=note_id, user_id=user_id)
+    db.add(new_like)
     note.likes += 1
     db.commit()
-    return {"message": "Liked", "likes": note.likes}
+    return {"message": "Liked", "likes": note.likes, "isLiked": True}
 
 @app.post("/api/notes/{note_id}/share")
 def share_note(note_id: int, token: str, db: Session = Depends(get_db)):
