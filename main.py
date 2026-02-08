@@ -154,7 +154,8 @@ def get_notes(subject: Optional[str] = None, db: Session = Depends(get_db)):
         "shares": n.shares,
         "likes": n.likes,
         "user_id": n.user_id,
-        "owner_name": n.owner.name
+        "owner_name": n.owner.name,
+        "file_url": n.file_path
     } for n in notes]
 
 @app.get("/api/notes/{note_id}")
@@ -178,7 +179,7 @@ def download_note(note_id: int, token: str, db: Session = Depends(get_db)):
     db.add(transaction)
     db.commit()
     
-    return {"message": "Download successful", "file_path": note.file_path}
+    return {"message": "Download successful", "file_url": note.file_path}
 
 @app.get("/api/user/earnings")
 def get_earnings(token: str, db: Session = Depends(get_db)):
@@ -265,19 +266,17 @@ def update_note(note_id: int, title: str, subject: str, description: str, price:
     db.commit()
     return {"message": "Note updated", "note": {"id": note.id, "title": note.title}}
 
-@app.post("/api/notes/{note_id}/download")
-def download_note(note_id: int, token: str, db: Session = Depends(get_db)):
-    user_id = int(verify_token(token))
-    note = db.query(Note).filter(Note.id == note_id).first()
-    if not note:
-        raise HTTPException(status_code=404, detail="Note not found")
-    
-    note.downloads += 1
-    db.commit()
-    
-    return {"message": "Download successful", "file_url": note.file_path}
-
 @app.post("/api/user/upgrade-premium")
+def upgrade_premium(token: str, db: Session = Depends(get_db)):
+    user_id = int(verify_token(token))
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_premium = 1
+    db.commit()
+    return {"message": "Upgraded to premium", "is_premium": True}
+
+
 def upgrade_premium(token: str, db: Session = Depends(get_db)):
     user_id = int(verify_token(token))
     user = db.query(User).filter(User.id == user_id).first()
