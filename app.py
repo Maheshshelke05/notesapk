@@ -184,7 +184,7 @@ async def upload_note(file: UploadFile = File(...), title: str = Form(...), subj
     user_id = int(verify_token(token))
     file_content = await file.read()
     file_key = f"notes/{user_id}/{datetime.utcnow().timestamp()}_{file.filename}"
-    s3_client.put_object(Bucket=AWS_BUCKET, Key=file_key, Body=file_content, ContentType='application/pdf', ACL='public-read')
+    s3_client.put_object(Bucket=AWS_BUCKET, Key=file_key, Body=file_content, ContentType='application/pdf')
     s3_url = f"https://{AWS_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{file_key}"
     note = Note(user_id=user_id, title=title, subject=subject, description=description, price=0, file_path=s3_url)
     db.add(note)
