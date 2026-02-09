@@ -159,7 +159,15 @@ def get_my_notes(token: str, db: Session = Depends(get_db)):
 def get_earnings(token: str, db: Session = Depends(get_db)):
     user_id = int(verify_token(token))
     user_notes = db.query(Note).filter(Note.user_id == user_id).all()
-    return {"total_earnings": sum(n.earnings for n in user_notes), "total_downloads": sum(n.downloads for n in user_notes), "notes_count": len(user_notes)}
+    total_earnings = sum(n.earnings for n in user_notes)
+    total_downloads = sum(n.downloads for n in user_notes)
+    return {
+        "total_earnings": round(total_earnings, 2),
+        "total_downloads": total_downloads,
+        "notes_count": len(user_notes),
+        "earnings_per_download": 0.10,
+        "message": f"You earn ₹0.10 per download. {total_downloads} downloads = ₹{round(total_earnings, 2)}"
+    }
 
 @app.post("/api/user/upgrade-premium")
 def upgrade_premium(token: str, db: Session = Depends(get_db)):
