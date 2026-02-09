@@ -6,7 +6,7 @@ import jwt
 from datetime import datetime, timedelta
 import os
 import boto3
-from database import init_db, get_db, User, Note, Transaction, NoteLike
+from database import init_db, get_db, User, Note, Transaction, NoteLike, NoteDownload, NoteShare
 
 app = FastAPI(title="Notes2Cash API")
 
@@ -122,11 +122,19 @@ def download_note(note_id: int, token: str, db: Session = Depends(get_db)):
     note = db.query(Note).filter(Note.id == note_id).first()
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
-    note.downloads += 1
-    note.earnings += note.price
-    db.add(Transaction(note_id=note.id, buyer_id=user_id, amount=note.price))
-    db.commit()
-    return {"message": "Download successful", "file_url": note.file_path}
+    
+    # Check if user already downloaded
+    existing_download = db.query(NoteDownload).filter(NoteDownload.note_id == note_id, NoteDownload.user_id == user_id).first()
+    if not existing_download:
+        # Add new download record
+        new_download = NoteDownload(note_id=note_id, user_id=user_id)
+        db.add(new_download)
+        note.downloads += 1
+        note.earnings += note.price
+        db.add(Transaction(note_id=note.id, buyer_id=user_id, amount=note.price))
+        db.commit()
+    
+    return {"message": "Download successful", "file_url": note.file_path, "already_downloaded": existing_download is not None}
 
 @app.post("/api/notes/{note_id}/like")
 def like_note(note_id: int, token: str, db: Session = Depends(get_db)):
@@ -149,13 +157,22 @@ def like_note(note_id: int, token: str, db: Session = Depends(get_db)):
 
 @app.post("/api/notes/{note_id}/share")
 def share_note(note_id: int, token: str, db: Session = Depends(get_db)):
-    verify_token(token)
+    user_id = int(verify_token(token))
     note = db.query(Note).filter(Note.id == note_id).first()
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
-    note.shares += 1
-    db.commit()
-    return {"message": "Shared", "shares": note.shares}
+    
+    # Check if user already shared
+    existing_share = db.query(NoteShare).filter(NoteShare.note_id == note_id, NoteShare.user_id == user_id).first()
+    if not existing_share:
+        # Add new share record
+        new_share = NoteShare(note_id=note_id, user_id=user_id)
+        db.add(new_share)
+        note.shares += 1
+        db.commit()
+        return {"message": "Shared", "shares": note.shares, "isShared": True}
+    
+    return {"message": "Already shared", "shares": note.shares, "isShared": True}
 
 @app.post("/api/notes/{note_id}/view")
 def view_note(note_id: int, token: str, db: Session = Depends(get_db)):
