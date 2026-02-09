@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Starting Notes2Cash API Deployment..."
+echo "🚀 Starting Notes2Cash API Deployment..."
 
 # Update system
 sudo yum update -y
@@ -8,7 +8,7 @@ sudo yum update -y
 # Install Python 3.11
 sudo yum install python3.11 python3.11-pip -y
 
-# Install MySQL
+# Install MySQL client
 sudo yum install mysql -y
 
 # Install dependencies
@@ -23,8 +23,8 @@ After=network.target
 [Service]
 Type=simple
 User=ec2-user
-WorkingDirectory=/home/ec2-user
-ExecStart=/usr/bin/python3.11 -m uvicorn main:app --host 0.0.0.0 --port 8000
+WorkingDirectory=/home/ec2-user/backend
+ExecStart=/usr/bin/python3.11 app.py
 Restart=always
 
 [Install]
@@ -38,6 +38,6 @@ sudo systemctl daemon-reload
 sudo systemctl enable notes2cash
 sudo systemctl start notes2cash
 
-echo "Deployment complete!"
+echo "✅ Deployment complete!"
 echo "Check status: sudo systemctl status notes2cash"
 echo "View logs: sudo journalctl -u notes2cash -f"
