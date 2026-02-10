@@ -127,16 +127,23 @@ async def get_book_detail(book_id: int, current_user: User = Depends(get_current
     
     images = []
     for img in book.images:
-        images.append({
-            "id": img.id,
-            "url": s3_service.generate_presigned_url(img.image_path, 3600),
-            "is_primary": img.is_primary
-        })
+        try:
+            url = s3_service.generate_presigned_url(img.image_path, 3600)
+            images.append({
+                "id": img.id,
+                "url": url,
+                "is_primary": img.is_primary
+            })
+            print(f"✅ Image URL generated for book {book_id}: {img.image_path}")
+        except Exception as e:
+            print(f"❌ Error generating URL for {img.image_path}: {e}")
     
     has_requested = db.query(BookBuyRequest).filter(
         BookBuyRequest.book_id == book_id,
         BookBuyRequest.buyer_id == current_user.id
     ).first() is not None
+    
+    print(f"📊 Book {book_id} has {len(images)} images")
     
     return {
         "id": book.id,
