@@ -170,8 +170,8 @@ async def upload_note(
         page_count = len(pdf_reader.pages)
         print(f"📄 PDF pages: {page_count}")
         
-        if page_count < 6:
-            raise HTTPException(status_code=400, detail=f"PDF must have at least 6 pages (found {page_count})")
+        if page_count < 1:
+            raise HTTPException(status_code=400, detail=f"PDF must have at least 1 page (found {page_count})")
     except HTTPException:
         raise
     except Exception as e:
