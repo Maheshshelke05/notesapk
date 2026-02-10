@@ -100,12 +100,21 @@ async def get_books(
     latitude: float = None,
     longitude: float = None,
     radius: float = 10,
+    search: str = None,
     db: Session = Depends(get_db)
 ):
     query = db.query(Book).filter(
         Book.status == BookStatus.AVAILABLE,
         Book.expires_at > datetime.utcnow()
     )
+    
+    if search:
+        query = query.filter(
+            or_(
+                Book.title.ilike(f"%{search}%"),
+                Book.description.ilike(f"%{search}%")
+            )
+        )
     
     books = query.order_by(Book.created_at.desc()).offset(skip).limit(limit).all()
     
