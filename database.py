@@ -40,6 +40,8 @@ class User(Base):
     is_blocked = Column(Boolean, default=False)
     ai_messages_today = Column(Integer, default=0)
     ai_messages_reset_date = Column(DateTime, default=datetime.utcnow)
+    notes_uploaded_today = Column(Integer, default=0)
+    notes_upload_reset_date = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -82,6 +84,7 @@ class Note(Base):
     description = Column(Text)
     file_path = Column(String(500), nullable=False)
     file_size = Column(Integer)
+    file_hash = Column(String(64), index=True)
     downloads = Column(Integer, default=0)
     views = Column(Integer, default=0)
     shares = Column(Integer, default=0)

@@ -152,11 +152,35 @@ async def upload_note(
     if file_size > settings.MAX_PDF_SIZE_MB * 1024 * 1024:
         raise HTTPException(status_code=400, detail=f"File too large (max {settings.MAX_PDF_SIZE_MB}MB)")
     
-    user_notes_count = db.query(Note).filter(Note.user_id == current_user.id).count()
-    max_uploads = 10 if current_user.role == UserRole.PREMIUM else 3
+    # Check PDF pages
+    try:
+        from PyPDF2 import PdfReader
+        from io import BytesIO
+        pdf_reader = PdfReader(BytesIO(file_content))
+        page_count = len(pdf_reader.pages)
+        
+        if page_count < 6:
+            raise HTTPException(status_code=400, detail=f"PDF must have at least 6 pages (found {page_count})")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid PDF file: {str(e)}")
     
-    if user_notes_count >= max_uploads:
-        raise HTTPException(status_code=400, detail=f"Upload limit reached ({max_uploads} notes)")
+    # Check daily upload limit
+    from utils import reset_daily_counter_if_needed
+    reset_daily_counter_if_needed(current_user, "notes_uploaded_today", "notes_upload_reset_date")
+    
+    if current_user.notes_uploaded_today >= 3:
+        raise HTTPException(status_code=400, detail="Daily upload limit reached (3 notes per day)")
+    
+    # Check for duplicate PDF using hash
+    import hashlib
+    file_hash = hashlib.sha256(file_content).hexdigest()
+    
+    existing_note = db.query(Note).filter(Note.file_hash == file_hash).first()
+    if existing_note:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"This PDF already exists: '{existing_note.title}' uploaded by {existing_note.user.name}"
+        )
     
     file_path = s3_service.upload_note(file_content, file.filename, current_user.id)
     
@@ -166,9 +190,12 @@ async def upload_note(
         subject=subject,
         description=description,
         file_path=file_path,
-        file_size=file_size
+        file_size=file_size,
+        file_hash=file_hash
     )
     db.add(note)
+    
+    current_user.notes_uploaded_today += 1
     db.commit()
     db.refresh(note)
     
@@ -189,13 +216,43 @@ async def get_notes(
         query = query.filter(Note.subject == subject)
     
     if search:
-        query = query.filter(
+        # Exact match first, then partial match
+        exact_match = query.filter(Note.title.ilike(search)).all()
+        partial_match = query.filter(
             or_(
                 Note.title.ilike(f"%{search}%"),
                 Note.description.ilike(f"%{search}%"),
                 Note.subject.ilike(f"%{search}%")
             )
-        )
+        ).all()
+        
+        # Combine: exact first, then partial (remove duplicates)
+        seen_ids = set()
+        notes = []
+        for note in exact_match + partial_match:
+            if note.id not in seen_ids:
+                notes.append(note)
+                seen_ids.add(note.id)
+        
+        result = []
+        for note in notes[skip:skip+limit]:
+            result.append({
+                "id": note.id,
+                "title": note.title,
+                "subject": note.subject,
+                "description": note.description,
+                "downloads": note.downloads,
+                "views": note.views,
+                "shares": note.shares,
+                "likes": note.likes,
+                "created_at": note.created_at,
+                "user": {
+                    "id": note.user.id,
+                    "name": note.user.name
+                }
+            })
+        
+        return {"notes": result, "total": len(notes)}
     
     if sort == "trending":
         query = query.order_by((Note.downloads + Note.likes * 2 + Note.shares * 3).desc())
