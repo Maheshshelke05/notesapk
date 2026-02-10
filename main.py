@@ -19,8 +19,18 @@ from routes import router
 from admin_routes import admin_router
 from debug_routes import debug_router
 
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    init_db()
+    print("Database initialized successfully")
+    yield
+    # Shutdown (if needed)
+
 settings = get_settings()
-app = FastAPI(title="NotesHub API", version="1.0.0")
+app = FastAPI(title="NotesHub API", version="1.0.0", lifespan=lifespan)
 
 app.include_router(router)
 app.include_router(admin_router)
@@ -33,11 +43,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-async def startup_event():
-    init_db()
-    print("Database initialized successfully")
 
 @app.get("/")
 async def root():
