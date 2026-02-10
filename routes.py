@@ -153,14 +153,15 @@ async def get_book_detail(book_id: int, current_user: User = Depends(get_current
     }
 
 from pydantic import BaseModel
+from typing import Optional
 
 class BuyRequestData(BaseModel):
     full_name: str
     mobile_number: str
     latitude: float
     longitude: float
-    location_name: str | None = None
-    message: str | None = None
+    location_name: Optional[str] = None
+    message: Optional[str] = None
 
 @router.post("/api/books/{book_id}/buy-request")
 async def create_buy_request(
