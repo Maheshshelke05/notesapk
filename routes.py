@@ -224,13 +224,18 @@ async def get_my_books(current_user: User = Depends(get_current_user), db: Sessi
     for book in books:
         primary_image = next((img for img in book.images if img.is_primary), book.images[0] if book.images else None)
         
+        pending_requests = db.query(BookBuyRequest).filter(
+            BookBuyRequest.book_id == book.id,
+            BookBuyRequest.status == RequestStatus.PENDING
+        ).count()
+        
         result.append({
             "id": book.id,
             "title": book.title,
             "price": book.price,
             "status": book.status,
             "primary_image": s3_service.generate_presigned_url(primary_image.image_path, 3600) if primary_image else None,
-            "requests_count": len(book.buy_requests),
+            "requests_count": pending_requests,
             "created_at": book.created_at,
             "expires_at": book.expires_at
         })
