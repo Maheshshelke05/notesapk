@@ -141,7 +141,7 @@ async def upload_note(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if file.content_type != "application/pdf":
+    if file.content_type not in ["application/pdf", "application/octet-stream"]:
         raise HTTPException(status_code=400, detail="Only PDF files allowed")
     
     file_content = await file.read()
