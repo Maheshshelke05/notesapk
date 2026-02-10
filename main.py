@@ -259,7 +259,7 @@ async def download_note(
     
     ip_address = request.client.host
     
-    if not rate_limiter.check_rate_limit(f"download_{ip_address}", 10, 3600):
+    if not rate_limiter.check_rate_limit(f"download_{ip_address}", 100, 3600):
         raise HTTPException(status_code=429, detail="Too many downloads, try later")
     
     existing_download = db.query(NoteDownload).filter(
