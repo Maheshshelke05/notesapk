@@ -17,12 +17,14 @@ from utils import rate_limiter, calculate_distance, is_within_radius, reset_dail
 from config import get_settings
 from routes import router
 from admin_routes import admin_router
+from debug_routes import debug_router
 
 settings = get_settings()
 app = FastAPI(title="NotesHub API", version="1.0.0")
 
 app.include_router(router)
 app.include_router(admin_router)
+app.include_router(debug_router)
 
 app.add_middleware(
     CORSMiddleware,
