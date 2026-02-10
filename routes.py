@@ -55,8 +55,15 @@ async def upload_book(
     for idx, image in enumerate(images):
         print(f"📷 Processing image {idx + 1}: {image.filename}, type: {image.content_type}")
         
-        if image.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
+        # Accept octet-stream and check file extension
+        valid_types = ["image/jpeg", "image/png", "image/jpg", "application/octet-stream"]
+        if image.content_type not in valid_types:
             print(f"❌ Skipped - invalid type: {image.content_type}")
+            continue
+        
+        # Check file extension
+        if not image.filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+            print(f"❌ Skipped - invalid extension: {image.filename}")
             continue
         
         image_content = await image.read()
