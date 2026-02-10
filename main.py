@@ -148,11 +148,16 @@ async def upload_note(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    print(f"📤 Upload request from user {current_user.id}: {title}")
+    print(f"File: {file.filename}, Content-Type: {file.content_type}")
+    
     if file.content_type not in ["application/pdf", "application/octet-stream"]:
+        print(f"❌ Invalid content type: {file.content_type}")
         raise HTTPException(status_code=400, detail="Only PDF files allowed")
     
     file_content = await file.read()
     file_size = len(file_content)
+    print(f"📏 File size: {file_size} bytes")
     
     if file_size > settings.MAX_PDF_SIZE_MB * 1024 * 1024:
         raise HTTPException(status_code=400, detail=f"File too large (max {settings.MAX_PDF_SIZE_MB}MB)")
@@ -163,10 +168,14 @@ async def upload_note(
         from io import BytesIO
         pdf_reader = PdfReader(BytesIO(file_content))
         page_count = len(pdf_reader.pages)
+        print(f"📄 PDF pages: {page_count}")
         
         if page_count < 6:
             raise HTTPException(status_code=400, detail=f"PDF must have at least 6 pages (found {page_count})")
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"❌ PDF validation error: {e}")
         raise HTTPException(status_code=400, detail=f"Invalid PDF file: {str(e)}")
     
     # Check daily upload limit
@@ -179,6 +188,7 @@ async def upload_note(
     # Check for duplicate PDF using hash
     import hashlib
     file_hash = hashlib.sha256(file_content).hexdigest()
+    print(f"🔐 File hash: {file_hash[:16]}...")
     
     existing_note = db.query(Note).filter(Note.file_hash == file_hash).first()
     if existing_note:
@@ -188,6 +198,7 @@ async def upload_note(
         )
     
     file_path = s3_service.upload_note(file_content, file.filename, current_user.id)
+    print(f"☁️ Uploaded to S3: {file_path}")
     
     note = Note(
         user_id=current_user.id,
@@ -204,6 +215,7 @@ async def upload_note(
     db.commit()
     db.refresh(note)
     
+    print(f"✅ Note uploaded successfully: ID {note.id}")
     return {"message": "Note uploaded successfully", "note_id": note.id}
 
 @app.get("/api/notes")
