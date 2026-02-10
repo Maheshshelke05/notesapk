@@ -122,7 +122,7 @@ async def get_books(
         image_url = None
         if primary_image:
             try:
-                image_url = s3_service.generate_presigned_url(primary_image.image_path, 3600)
+                image_url = s3_service.generate_presigned_url(primary_image.image_path, 86400)  # 24 hours
             except Exception as e:
                 print(f"Error generating presigned URL for book {book.id}: {e}")
         
@@ -153,7 +153,7 @@ async def get_book_detail(book_id: int, current_user: User = Depends(get_current
     images = []
     for img in book.images:
         try:
-            url = s3_service.generate_presigned_url(img.image_path, 3600)
+            url = s3_service.generate_presigned_url(img.image_path, 86400)  # 24 hours
             images.append({
                 "id": img.id,
                 "url": url,
@@ -275,7 +275,7 @@ async def get_my_books(current_user: User = Depends(get_current_user), db: Sessi
         image_url = None
         if primary_image:
             try:
-                image_url = s3_service.generate_presigned_url(primary_image.image_path, 3600)
+                image_url = s3_service.generate_presigned_url(primary_image.image_path, 86400)  # 24 hours
             except Exception as e:
                 print(f"Error generating presigned URL: {e}")
         
