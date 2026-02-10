@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 from datetime import datetime, timedelta
 from typing import List, Optional
+from pydantic import BaseModel
 import uvicorn
 
 from database import init_db, get_db, User, LoginLog, Note, NoteLike, NoteDownload, Book, BookImage, BookBuyRequest, Notification, ChatLog, AbuseReport, UserRole, BookStatus, RequestStatus
@@ -40,15 +41,20 @@ async def startup_event():
 async def root():
     return {"message": "NotesHub API", "status": "running"}
 
+from pydantic import BaseModel
+
+class GoogleLoginRequest(BaseModel):
+    google_token: str
+    device_info: str = None
+
 # AUTH ROUTES
 @app.post("/api/auth/google")
 async def google_login(
-    google_token: str = Form(...),
-    device_info: str = Form(None),
-    request: Request = None,
+    login_data: GoogleLoginRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ):
-    user_info = google_auth_service.verify_google_token(google_token)
+    user_info = google_auth_service.verify_google_token(login_data.google_token)
     
     user = db.query(User).filter(User.google_id == user_info['google_id']).first()
     
@@ -71,7 +77,7 @@ async def google_login(
     login_log = LoginLog(
         user_id=user.id,
         ip_address=ip_address,
-        device_info=device_info
+        device_info=login_data.device_info
     )
     db.add(login_log)
     db.commit()
