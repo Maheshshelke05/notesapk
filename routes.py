@@ -159,8 +159,8 @@ class BuyRequestData(BaseModel):
     mobile_number: str
     latitude: float
     longitude: float
-    location_name: str = None
-    message: str = None
+    location_name: str | None = None
+    message: str | None = None
 
 @router.post("/api/books/{book_id}/buy-request")
 async def create_buy_request(
