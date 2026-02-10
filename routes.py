@@ -26,6 +26,8 @@ async def upload_book(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    print(f"📤 Uploading book with {len(images)} images")
+    
     if len(images) > 5:
         raise HTTPException(status_code=400, detail="Maximum 5 images allowed")
     
@@ -47,26 +49,42 @@ async def upload_book(
     db.commit()
     db.refresh(book)
     
+    print(f"✅ Book created with ID: {book.id}")
+    
+    uploaded_count = 0
     for idx, image in enumerate(images):
+        print(f"📷 Processing image {idx + 1}: {image.filename}, type: {image.content_type}")
+        
         if image.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
+            print(f"❌ Skipped - invalid type: {image.content_type}")
             continue
         
         image_content = await image.read()
+        print(f"📏 Image size: {len(image_content)} bytes")
+        
         if len(image_content) > 5 * 1024 * 1024:
+            print(f"❌ Skipped - too large")
             continue
         
-        image_path = s3_service.upload_book_image(image_content, image.filename, current_user.id)
-        
-        book_image = BookImage(
-            book_id=book.id,
-            image_path=image_path,
-            is_primary=(idx == 0)
-        )
-        db.add(book_image)
+        try:
+            image_path = s3_service.upload_book_image(image_content, image.filename, current_user.id)
+            print(f"☁️ Uploaded to S3: {image_path}")
+            
+            book_image = BookImage(
+                book_id=book.id,
+                image_path=image_path,
+                is_primary=(idx == 0)
+            )
+            db.add(book_image)
+            uploaded_count += 1
+            print(f"✅ Image {idx + 1} saved to database")
+        except Exception as e:
+            print(f"❌ Error uploading image {idx + 1}: {e}")
     
     db.commit()
+    print(f"🎉 Total {uploaded_count} images uploaded for book {book.id}")
     
-    return {"message": "Book uploaded successfully", "book_id": book.id}
+    return {"message": "Book uploaded successfully", "book_id": book.id, "images_uploaded": uploaded_count}
 
 @router.get("/api/books")
 async def get_books(
