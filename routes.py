@@ -207,7 +207,7 @@ async def create_buy_request(
     
     return {"message": "Buy request sent successfully"}
 
-@router.get("/api/books/my-books")
+@router.get("/api/user/my-books")
 async def get_my_books(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     books = db.query(Book).filter(Book.user_id == current_user.id).order_by(Book.created_at.desc()).all()
     
