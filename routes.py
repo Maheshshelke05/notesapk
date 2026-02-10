@@ -417,7 +417,7 @@ async def ai_chat(
 ):
     reset_daily_counter_if_needed(current_user, "ai_messages_today", "ai_messages_reset_date")
     
-    max_messages = 100 if current_user.role == UserRole.PREMIUM else 20
+    max_messages = 100 if current_user.role == UserRole.PREMIUM else 50
     
     if current_user.ai_messages_today >= max_messages:
         raise HTTPException(status_code=429, detail=f"Daily limit reached ({max_messages} messages)")

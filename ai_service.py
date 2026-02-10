@@ -6,8 +6,9 @@ settings = get_settings()
 
 class AIService:
     def __init__(self):
-        self.api_key = settings.OPENROUTER_API_KEY
-        self.base_url = "https://openrouter.ai/api/v1/chat/completions"
+        self.api_key = settings.GROQ_API_KEY
+        self.base_url = "https://api.groq.com/openai/v1/chat/completions"
+        self.model = "llama-3.3-70b-versatile"
     
     async def chat(self, message: str, max_tokens: int = 500) -> dict:
         """Send message to AI and get response"""
@@ -20,11 +21,13 @@ class AIService:
         }
         
         payload = {
-            "model": "openai/gpt-3.5-turbo",
+            "model": self.model,
             "messages": [
+                {"role": "system", "content": "You are a helpful AI assistant for students. Help them with their studies, homework, and learning."},
                 {"role": "user", "content": message}
             ],
-            "max_tokens": max_tokens
+            "max_tokens": max_tokens,
+            "temperature": 0.7
         }
         
         try:

@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # OpenRouter
     OPENROUTER_API_KEY: str
     
+    # Groq AI
+    GROQ_API_KEY: str
+    
     # App
     APP_URL: str
     FRONTEND_URL: str = "http://localhost:3000"
