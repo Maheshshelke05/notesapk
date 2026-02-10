@@ -148,16 +148,21 @@ async def get_book_detail(book_id: int, current_user: User = Depends(get_current
         }
     }
 
+from pydantic import BaseModel
+
+class BuyRequestData(BaseModel):
+    full_name: str
+    mobile_number: str
+    latitude: float
+    longitude: float
+    location_name: str = None
+    message: str = None
+
 @router.post("/api/books/{book_id}/buy-request")
 async def create_buy_request(
     book_id: int,
-    full_name: str = Form(...),
-    mobile_number: str = Form(...),
-    latitude: float = Form(...),
-    longitude: float = Form(...),
-    location_name: str = Form(None),
-    message: str = Form(None),
-    request: Request = None,
+    data: BuyRequestData,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -186,12 +191,12 @@ async def create_buy_request(
     buy_request = BookBuyRequest(
         book_id=book_id,
         buyer_id=current_user.id,
-        full_name=full_name,
-        mobile_number=mobile_number,
-        latitude=latitude,
-        longitude=longitude,
-        location_name=location_name,
-        message=message,
+        full_name=data.full_name,
+        mobile_number=data.mobile_number,
+        latitude=data.latitude,
+        longitude=data.longitude,
+        location_name=data.location_name,
+        message=data.message,
         status=RequestStatus.PENDING
     )
     db.add(buy_request)
