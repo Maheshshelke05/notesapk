@@ -179,6 +179,7 @@ async def get_notes(
     skip: int = 0,
     limit: int = 20,
     subject: str = None,
+    search: str = None,
     sort: str = "recent",
     db: Session = Depends(get_db)
 ):
@@ -186,6 +187,15 @@ async def get_notes(
     
     if subject:
         query = query.filter(Note.subject == subject)
+    
+    if search:
+        query = query.filter(
+            or_(
+                Note.title.ilike(f"%{search}%"),
+                Note.description.ilike(f"%{search}%"),
+                Note.subject.ilike(f"%{search}%")
+            )
+        )
     
     if sort == "trending":
         query = query.order_by((Note.downloads + Note.likes * 2 + Note.shares * 3).desc())
@@ -277,6 +287,10 @@ async def download_note(
         )
         db.add(download)
         note.downloads += 1
+        
+        # Earnings: 1000 downloads = ₹100, so 1 download = ₹0.1
+        note.earnings += 0.1
+        
         db.commit()
     
     presigned_url = s3_service.generate_presigned_url(note.file_path, 3600)
