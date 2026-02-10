@@ -8,7 +8,7 @@ from database import get_db, User, Book, BookImage, BookBuyRequest, Notification
 from auth import get_current_user
 from s3_service import s3_service
 from ai_service import ai_service
-from utils import rate_limiter, is_within_radius, reset_daily_counter_if_needed
+from utils import rate_limiter, is_within_radius, reset_daily_counter_if_needed, calculate_distance
 
 router = APIRouter()
 
