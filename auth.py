@@ -63,6 +63,8 @@ def get_current_admin(current_user: User = Depends(get_current_user)):
     return current_user
 
 def blacklist_token(token: str, db: Session):
-    blacklisted = TokenBlacklist(token=token)
-    db.add(blacklisted)
-    db.commit()
+    existing = db.query(TokenBlacklist).filter(TokenBlacklist.token == token).first()
+    if not existing:
+        blacklisted = TokenBlacklist(token=token)
+        db.add(blacklisted)
+        db.commit()
