@@ -204,6 +204,7 @@ async def create_buy_request(
         status=RequestStatus.PENDING
     )
     db.add(buy_request)
+    db.flush()
     
     notification = Notification(
         user_id=book.user_id,
@@ -213,6 +214,8 @@ async def create_buy_request(
     db.add(notification)
     
     db.commit()
+    
+    print(f"✅ Notification created for user {book.user_id}: {current_user.name} wants to buy {book.title}")
     
     return {"message": "Buy request sent successfully"}
 
