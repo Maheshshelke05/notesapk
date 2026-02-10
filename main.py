@@ -279,7 +279,7 @@ async def download_note(
     
     presigned_url = s3_service.generate_presigned_url(note.file_path, 3600)
     
-    return {"download_url": presigned_url}
+    return {"download_url": presigned_url, "filename": note.title + ".pdf"}
 
 @app.post("/api/notes/{note_id}/view")
 async def track_view(
@@ -291,19 +291,6 @@ async def track_view(
     note = db.query(Note).filter(Note.id == note_id).first()
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
-    
-    download = db.query(NoteDownload).filter(
-        NoteDownload.note_id == note_id,
-        NoteDownload.user_id == current_user.id
-    ).first()
-    
-    if download and view_duration >= 5 and not download.is_earning_counted:
-        download.is_earning_counted = True
-        download.view_duration = view_duration
-        
-        note.earnings += 0.1
-        
-        db.commit()
     
     note.views += 1
     db.commit()

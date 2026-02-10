@@ -86,8 +86,10 @@ async def get_books(
     
     result = []
     for book in books:
+        distance = None
         if latitude and longitude:
-            if not is_within_radius(latitude, longitude, book.latitude, book.longitude, radius):
+            distance = round(calculate_distance(latitude, longitude, book.latitude, book.longitude), 2)
+            if distance > radius:
                 continue
         
         primary_image = next((img for img in book.images if img.is_primary), book.images[0] if book.images else None)
@@ -99,6 +101,7 @@ async def get_books(
             "condition": book.condition,
             "price": book.price,
             "location_name": book.location_name,
+            "distance_km": distance,
             "primary_image": s3_service.generate_presigned_url(primary_image.image_path, 3600) if primary_image else None,
             "created_at": book.created_at,
             "user": {
@@ -140,6 +143,7 @@ async def get_book_detail(book_id: int, current_user: User = Depends(get_current
         "status": book.status,
         "images": images,
         "has_requested": has_requested,
+        "is_owner": book.user_id == current_user.id,
         "expires_at": book.expires_at,
         "created_at": book.created_at,
         "user": {
